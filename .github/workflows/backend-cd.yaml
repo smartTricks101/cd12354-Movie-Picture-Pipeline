@@ -50,4 +50,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: docker build --tag mp-backend:latest starter/backend
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get AWS account ID
+        run: echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - run: |
+          docker build \
+            --tag $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/backend:${{ github.sha }} \
+            starter/backend
+
+      - run: |
+          docker push \
+            $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/backend:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - run: aws eks update-kubeconfig --region us-east-1 --name cluster
+
+      - name: Get AWS account ID
+        run: echo "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
+
+      - run: |
+          cd starter/backend/k8s
+          kustomize edit set image backend=$AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/backend:${{ github.sha }}
+          kustomize build | kubectl apply -f -
