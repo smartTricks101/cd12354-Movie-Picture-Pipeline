@@ -4,8 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+uwsgi = ">=2.0.24"
 flask = "*"
-uwsgi = "*"
 flask-cors = "*"
 pytest = "*"
 
@@ -23,3 +23,4 @@ test = "pytest -v"
 lint = "flake8"
 report = "coverage run -m pytest -v"
 lint-fail = "flake8 --max-line-length=88"
+
